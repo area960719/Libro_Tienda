@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Windows.Forms;
 
-namespace LibroTienda
+namespace Libro_Tienda
 {
     public class Prenda
     {
@@ -47,6 +47,7 @@ namespace LibroTienda
             Text = "Libro de Ingresos y Gastos - Tienda de Ropa";
             Size = new Size(950, 620);
             StartPosition = FormStartPosition.CenterScreen;
+            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
 
             // Cuadrícula (se añade primero para que ocupe el espacio sobrante)
             grid = new DataGridView
