@@ -22,8 +22,9 @@ jobs:
           dotnet publish Libro_Tienda/Libro_Tienda.csproj
           -c Release
           -r win-x64
-          --self-contained false
+          --self-contained true
           -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
           -o publicar
 
       - name: Subir el .exe
