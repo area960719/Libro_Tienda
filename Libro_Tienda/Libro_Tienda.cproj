@@ -6,8 +6,8 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <AssemblyName>LibroTienda</AssemblyName>
-    <RootNamespace>LibroTienda</RootNamespace>
+    <AssemblyName>Libro_Tienda</AssemblyName>
+    <RootNamespace>Libro_Tienda</RootNamespace>
   </PropertyGroup>
 
 </Project>
