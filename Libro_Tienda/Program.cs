@@ -150,6 +150,19 @@ namespace Libro_Tienda
             nav.Controls.Add(btnCompras);
             nav.Controls.Add(btnVentas);
 
+            var btnExportar = new Button
+            {
+                Text = "Exportar para imprimir",
+                Location = new Point(330, 7),
+                Size = new Size(200, 36),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(46, 184, 92),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+            btnExportar.Click += (s, e) => ExportarReporte();
+            nav.Controls.Add(btnExportar);
+
             Controls.Add(pageCompras);
             Controls.Add(pageVentas);
             Controls.Add(nav);
@@ -871,6 +884,135 @@ namespace Libro_Tienda
             cargando = false;
 
             RefrescarBorrador();
+        }
+
+        // ---------- Exportar para imprimir ----------
+
+        static string H(string s)
+        {
+            return System.Net.WebUtility.HtmlEncode(s ?? "");
+        }
+
+        static string M(decimal d)
+        {
+            return d.ToString("N2");
+        }
+
+        void ExportarReporte()
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                var ventas = pacas
+                    .SelectMany(p => p.Ventas.Select(v => new Fila { P = p, V = v }))
+                    .OrderBy(f => f.V.Fecha)
+                    .ThenBy(f => f.P.Nombre)
+                    .ToList();
+
+                decimal invertido = pacas.Sum(p => p.CostoTotal);
+                decimal vendido = ventas.Sum(f => f.V.Total);
+                int unidadesVendidas = ventas.Sum(f => f.V.Cantidad);
+                int enStock = pacas.Sum(p => p.EnStock);
+
+                sb.AppendLine("<!DOCTYPE html>");
+                sb.AppendLine("<html lang=\"es\"><head><meta charset=\"utf-8\">");
+                sb.AppendLine("<title>Libro de Ingresos y Gastos</title>");
+                sb.AppendLine("<style>");
+                sb.AppendLine("body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#000;margin:24px;}");
+                sb.AppendLine("h1{font-size:22px;margin:0 0 4px;}");
+                sb.AppendLine("h2{font-size:17px;margin:26px 0 8px;border-bottom:2px solid #000;padding-bottom:3px;}");
+                sb.AppendLine("h3{font-size:14px;margin:0 0 4px;}");
+                sb.AppendLine("p{margin:3px 0 6px;}");
+                sb.AppendLine(".sub{color:#444;margin-bottom:14px;}");
+                sb.AppendLine("table{border-collapse:collapse;width:100%;margin-bottom:10px;}");
+                sb.AppendLine("th,td{border:1px solid #666;padding:5px 7px;text-align:left;}");
+                sb.AppendLine("th{background:#e6e6e6;}");
+                sb.AppendLine(".n{text-align:right;}");
+                sb.AppendLine(".paca{margin-bottom:18px;page-break-inside:avoid;}");
+                sb.AppendLine(".total td{font-weight:bold;background:#f2f2f2;}");
+                sb.AppendLine("button{padding:8px 16px;font-size:14px;margin-bottom:14px;cursor:pointer;}");
+                sb.AppendLine("@media print{.noprint{display:none;}body{margin:10mm;}}");
+                sb.AppendLine("</style></head><body>");
+
+                sb.AppendLine("<button class=\"noprint\" onclick=\"window.print()\">Imprimir / Guardar como PDF</button>");
+                sb.AppendLine("<h1>Libro de Ingresos y Gastos - Tienda de Ropa</h1>");
+                sb.AppendLine("<div class=\"sub\">Reporte generado el " + H(DateTime.Now.ToString("dd/MM/yyyy HH:mm")) + "</div>");
+
+                // Resumen general
+                sb.AppendLine("<h2>Resumen general</h2>");
+                sb.AppendLine("<table>");
+                sb.AppendLine("<tr><th>Total invertido</th><th>Total vendido</th><th>Ganancia</th><th>Prendas vendidas</th><th>Prendas en stock</th></tr>");
+                sb.AppendLine("<tr><td class=\"n\">" + M(invertido) + "</td><td class=\"n\">" + M(vendido) + "</td><td class=\"n\">" +
+                    M(vendido - invertido) + "</td><td class=\"n\">" + unidadesVendidas + "</td><td class=\"n\">" + enStock + "</td></tr>");
+                sb.AppendLine("</table>");
+
+                // Compras (pacas)
+                sb.AppendLine("<h2>Compras (pacas)</h2>");
+                if (pacas.Count == 0) sb.AppendLine("<p><i>No hay pacas registradas.</i></p>");
+                foreach (var p in pacas)
+                {
+                    sb.AppendLine("<div class=\"paca\">");
+                    sb.AppendLine("<h3>" + H(p.Nombre) + " &mdash; comprada el " + H(p.FechaCompra.ToShortDateString()) + "</h3>");
+                    sb.AppendLine("<p>Costo total: <b>" + M(p.CostoTotal) + "</b> &nbsp;|&nbsp; Vendido: <b>" + M(p.TotalVendido) +
+                        "</b> &nbsp;|&nbsp; Ganancia: <b>" + M(p.Ganancia) + "</b></p>");
+                    if (p.Items.Count == 0)
+                    {
+                        sb.AppendLine("<p><i>Esta paca no tiene prendas registradas.</i></p>");
+                    }
+                    else
+                    {
+                        sb.AppendLine("<table>");
+                        sb.AppendLine("<tr><th>Prenda</th><th class=\"n\">Cantidad comprada</th><th class=\"n\">Vendidas</th><th class=\"n\">Quedan</th></tr>");
+                        foreach (var a in p.Items)
+                        {
+                            int vend = p.VendidasDe(a.Tipo);
+                            sb.AppendLine("<tr><td>" + H(a.Tipo) + "</td><td class=\"n\">" + a.Cantidad + "</td><td class=\"n\">" +
+                                vend + "</td><td class=\"n\">" + (a.Cantidad - vend) + "</td></tr>");
+                        }
+                        sb.AppendLine("<tr class=\"total\"><td>Total</td><td class=\"n\">" + p.UnidadesCompradas + "</td><td class=\"n\">" +
+                            p.Items.Sum(a => p.VendidasDe(a.Tipo)) + "</td><td class=\"n\">" + p.EnStock + "</td></tr>");
+                        sb.AppendLine("</table>");
+                    }
+                    sb.AppendLine("</div>");
+                }
+
+                // Ventas
+                sb.AppendLine("<h2>Ventas</h2>");
+                if (ventas.Count == 0)
+                {
+                    sb.AppendLine("<p><i>No hay ventas registradas.</i></p>");
+                }
+                else
+                {
+                    sb.AppendLine("<table>");
+                    sb.AppendLine("<tr><th>Fecha</th><th>Paca</th><th>Prenda</th><th class=\"n\">Cantidad</th><th class=\"n\">Precio c/u</th><th class=\"n\">Total</th></tr>");
+                    foreach (var f in ventas)
+                    {
+                        sb.AppendLine("<tr><td>" + H(f.V.Fecha.ToShortDateString()) + "</td><td>" + H(f.P.Nombre) + "</td><td>" +
+                            H(f.V.Prenda) + "</td><td class=\"n\">" + f.V.Cantidad + "</td><td class=\"n\">" +
+                            M(f.V.PrecioUnitario) + "</td><td class=\"n\">" + M(f.V.Total) + "</td></tr>");
+                    }
+                    sb.AppendLine("<tr class=\"total\"><td colspan=\"3\">Total vendido</td><td class=\"n\">" + unidadesVendidas +
+                        "</td><td></td><td class=\"n\">" + M(vendido) + "</td></tr>");
+                    sb.AppendLine("</table>");
+                }
+
+                sb.AppendLine("</body></html>");
+
+                string dir = Path.Combine(carpeta, "Reportes");
+                Directory.CreateDirectory(dir);
+                string ruta = Path.Combine(dir, "Reporte_" + DateTime.Now.ToString("yyyy-MM-dd_HHmm") + ".html");
+                File.WriteAllText(ruta, sb.ToString(), new System.Text.UTF8Encoding(true));
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(ruta) { UseShellExecute = true });
+                MessageBox.Show("Reporte guardado en:\n" + ruta +
+                    "\n\nSe abrió en tu navegador. Pulsa el botón \"Imprimir / Guardar como PDF\" (o Ctrl+P) para sacar la copia en papel.",
+                    "Reporte listo");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("No se pudo crear el reporte: " + ex.Message);
+            }
         }
 
         // ---------- Guardar / cargar ----------
